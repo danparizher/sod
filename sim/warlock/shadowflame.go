@@ -15,6 +15,21 @@ func (warlock *Warlock) registerShadowflameSpell() {
 	}
 
 	warlock.Shadowflame = warlock.RegisterSpell(warlock.getShadowflameConfig())
+
+	core.MakePermanent(warlock.RegisterAura(core.Aura{
+		Label: "Shadowflame ISB Trigger",
+		OnInit: func(aura *core.Aura, sim *core.Simulation) {
+			for _, target := range warlock.Env.Encounter.TargetUnits {
+				warlock.ImprovedShadowBoltAuras.Get(target).MaxStacks = core.ISBNumStacksShadowflame
+			}
+		},
+		OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, result *core.SpellResult) {
+			if spell.Matches(ClassSpellMask_WarlockShadowflame) && result.Landed() && result.DidCrit() {
+				isbAura := warlock.ImprovedShadowBoltAuras.Get(result.Target)
+				isbAura.Activate(sim)
+			}
+		},
+	}))
 }
 
 func (warlock *Warlock) getShadowflameConfig() core.SpellConfig {

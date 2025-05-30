@@ -619,44 +619,43 @@ func (warlock *Warlock) applyDemonicSacrifice() {
 ///////////////////////////////////////////////////////////////////////////
 
 func (warlock *Warlock) applyImprovedShadowBolt() {
-	hasShadowflameRune := warlock.HasRune(proto.WarlockRune_RuneBootsShadowflame)
-
-	// These debuffs get used by the T2.5 DPS 2p bonus and don't require the ISB talent, so always initialize them
-	stackCount := core.TernaryInt32(hasShadowflameRune, core.ISBNumStacksShadowflame, core.ISBNumStacksBase)
 	warlock.ImprovedShadowBoltAuras = warlock.NewEnemyAuraArray(func(target *core.Unit, level int32) *core.Aura {
 		isbAura := core.ImprovedShadowBoltAura(target, warlock.Talents.ImprovedShadowBolt)
 		// Use a wrapper to prevent an external ISB from affecting the warlock's effect count
-		return target.RegisterAura(core.Aura{
-			Label:     "Improved Shadow Bolt Wrapper",
-			Duration:  core.ISBDuration,
-			MaxStacks: isbAura.MaxStacks,
+		wrapperAura := target.RegisterAura(core.Aura{
+			Label:    "Improved Shadow Bolt Wrapper",
+			Duration: core.ISBDuration,
 			OnGain: func(aura *core.Aura, sim *core.Simulation) {
 				warlock.activeEffects[aura.Unit.UnitIndex]++
 				isbAura.Activate(sim)
-				isbAura.SetStacks(sim, stackCount)
+				isbAura.SetStacks(sim, isbAura.MaxStacks)
 			},
 			OnRefresh: func(aura *core.Aura, sim *core.Simulation) {
 				isbAura.Activate(sim)
-				isbAura.SetStacks(sim, stackCount)
+				isbAura.SetStacks(sim, isbAura.MaxStacks)
 			},
 			OnExpire: func(aura *core.Aura, sim *core.Simulation) {
 				warlock.activeEffects[aura.Unit.UnitIndex]--
 			},
 		})
+
+		isbAura.ApplyOnExpire(func(aura *core.Aura, sim *core.Simulation) {
+			wrapperAura.Deactivate(sim)
+		})
+
+		return wrapperAura
 	})
 
 	if warlock.Talents.ImprovedShadowBolt == 0 {
 		return
 	}
 
-	improvedShadowBoltSpellClassMasks := ClassSpellMask_WarlockShadowBolt | ClassSpellMask_WarlockShadowCleave | ClassSpellMask_WarlockShadowflame
 	core.MakePermanent(warlock.RegisterAura(core.Aura{
 		Label: "ISB Trigger",
 		OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, result *core.SpellResult) {
-			if result.Landed() && result.DidCrit() && spell.Matches(improvedShadowBoltSpellClassMasks) {
+			if result.Landed() && result.DidCrit() && spell.Matches(ClassSpellMask_WarlockShadowBolt) {
 				isbAura := warlock.ImprovedShadowBoltAuras.Get(result.Target)
 				isbAura.Activate(sim)
-				isbAura.SetStacks(sim, stackCount)
 			}
 		},
 	}))

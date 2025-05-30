@@ -36,12 +36,15 @@ func (warlock *Warlock) applyTAQDamage2PBonus() {
 
 	core.MakePermanent(warlock.RegisterAura(core.Aura{
 		Label: label,
+		OnInit: func(aura *core.Aura, sim *core.Simulation) {
+			for _, target := range warlock.Env.Encounter.TargetUnits {
+				warlock.ImprovedShadowBoltAuras.Get(target).MaxStacks = core.ISBNumStacksShadowflame
+			}
+		},
 		OnSpellHitDealt: func(aura *core.Aura, sim *core.Simulation, spell *core.Spell, result *core.SpellResult) {
 			if result.Landed() && result.DidCrit() && spell.Matches(ClassSpellMask_WarlockChaosBolt) {
 				isbAura := warlock.ImprovedShadowBoltAuras.Get(result.Target)
 				isbAura.Activate(sim)
-				// This set always uses 30 stacks
-				isbAura.SetStacks(sim, core.ISBNumStacksShadowflame)
 			}
 		},
 	})).AttachSpellMod(core.SpellModConfig{
